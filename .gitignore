@@ -1,0 +1,15 @@
+.env
+__pycache__
+.venv
+.pytest_cache
+.coverage
+htmlcov
+.vscode
+.idea
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+.DS_Store
+Thumbs.db
