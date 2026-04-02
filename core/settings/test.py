@@ -12,3 +12,5 @@ DATABASES = {
         "PORT": config("DB_PORT", default="5432"),
     }
 }
+
+RATELIMIT_ENABLE = False
