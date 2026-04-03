@@ -135,7 +135,7 @@ class TransactionDetailView(APIView):
     )
     def delete(self, request, pk):
         transaction = self.get_object(pk)
-        transaction.delete()
+        transaction.soft_delete()
         return Response(
             {"success": True, "message": "Transaction deleted successfully."},
             status=status.HTTP_200_OK,
