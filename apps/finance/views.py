@@ -1,16 +1,24 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
+from django.db.models import Q
 
 from apps.finance.models import Transaction
 from apps.finance.serializers import TransactionSerializer, TransactionCreateUpdateSerializer
 from apps.finance.filters import TransactionFilter
 from apps.users.permissions import IsAdmin, IsAnalystOrAbove
+
+
+class TransactionPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
 
 
 class TransactionListView(APIView):
@@ -22,8 +30,12 @@ class TransactionListView(APIView):
 
     @extend_schema(
         summary="List all transactions",
-        description="Returns all transactions. Supports filtering by type, category, date range, and amount range.",
+        description=(
+            "Returns paginated transactions. Supports filtering by type, category, "
+            "date range, amount range, and full-text search on notes and category."
+        ),
         parameters=[
+            OpenApiParameter("search", OpenApiTypes.STR, description="Search notes or category"),
             OpenApiParameter("type", OpenApiTypes.STR, description="Filter by type: income or expense"),
             OpenApiParameter("category", OpenApiTypes.STR, description="Filter by category"),
             OpenApiParameter("date_from", OpenApiTypes.DATE, description="Filter from date (YYYY-MM-DD)"),
@@ -31,6 +43,8 @@ class TransactionListView(APIView):
             OpenApiParameter("amount_min", OpenApiTypes.FLOAT, description="Minimum amount"),
             OpenApiParameter("amount_max", OpenApiTypes.FLOAT, description="Maximum amount"),
             OpenApiParameter("ordering", OpenApiTypes.STR, description="Order by: date, amount, created_at (prefix - for descending)"),
+            OpenApiParameter("page", OpenApiTypes.INT, description="Page number"),
+            OpenApiParameter("page_size", OpenApiTypes.INT, description="Results per page (default: 20, max: 100)"),
         ],
         responses={200: TransactionSerializer(many=True)},
         tags=["Transactions"],
@@ -38,6 +52,16 @@ class TransactionListView(APIView):
     def get(self, request):
         queryset = Transaction.objects.select_related("created_by").all()
 
+        # Search
+        search = request.GET.get("search", "").strip()
+        if search:
+            queryset = queryset.filter(
+                Q(notes__icontains=search) |
+                Q(category__icontains=search) |
+                Q(type__icontains=search)
+            )
+
+        # Filters
         filterset = TransactionFilter(request.GET, queryset=queryset)
         if not filterset.is_valid():
             return Response(
@@ -46,16 +70,26 @@ class TransactionListView(APIView):
             )
         queryset = filterset.qs
 
+        # Ordering
         ordering = request.GET.get("ordering", "-date")
         allowed_ordering = ["date", "-date", "amount", "-amount", "created_at", "-created_at"]
         if ordering in allowed_ordering:
             queryset = queryset.order_by(ordering)
 
-        serializer = TransactionSerializer(queryset, many=True)
+        # Pagination
+        paginator = TransactionPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = TransactionSerializer(page, many=True)
+
         return Response(
             {
                 "success": True,
-                "count": queryset.count(),
+                "count": paginator.page.paginator.count,
+                "total_pages": paginator.page.paginator.num_pages,
+                "current_page": paginator.page.number,
+                "page_size": paginator.get_page_size(request),
+                "next": paginator.get_next_link(),
+                "previous": paginator.get_previous_link(),
                 "data": serializer.data,
             },
             status=status.HTTP_200_OK,
@@ -130,7 +164,7 @@ class TransactionDetailView(APIView):
         )
 
     @extend_schema(
-        summary="Delete a transaction",
+        summary="Delete a transaction (soft delete)",
         tags=["Transactions"],
     )
     def delete(self, request, pk):

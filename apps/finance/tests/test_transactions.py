@@ -63,6 +63,7 @@ def auth_client(client, user):
     return client
 
 
+# --- List ---
 
 @pytest.mark.django_db
 def test_analyst_can_list_transactions(client, analyst_user, transaction):
@@ -86,15 +87,86 @@ def test_unauthenticated_cannot_list_transactions(client):
     assert response.status_code == 401
 
 
+# --- Pagination ---
+
+@pytest.mark.django_db
+def test_pagination_structure(client, admin_user):
+    for i in range(25):
+        Transaction.objects.create(
+            amount="100.00",
+            type="income",
+            category="other",
+            date=datetime.date.today(),
+            created_by=admin_user,
+        )
+    authed = auth_client(client, admin_user)
+    response = authed.get(reverse("transaction-list"))
+    assert response.status_code == 200
+    assert response.data["count"] == 25
+    assert response.data["total_pages"] == 2
+    assert response.data["current_page"] == 1
+    assert len(response.data["data"]) == 20
+
+
+@pytest.mark.django_db
+def test_pagination_page_size(client, admin_user):
+    for i in range(10):
+        Transaction.objects.create(
+            amount="100.00",
+            type="income",
+            category="other",
+            date=datetime.date.today(),
+            created_by=admin_user,
+        )
+    authed = auth_client(client, admin_user)
+    response = authed.get(reverse("transaction-list"), {"page_size": "5"})
+    assert response.status_code == 200
+    assert len(response.data["data"]) == 5
+    assert response.data["total_pages"] == 2
+
+
+# --- Search ---
+
+@pytest.mark.django_db
+def test_search_by_notes(client, admin_user):
+    Transaction.objects.create(
+        amount="100.00", type="income", category="other",
+        date=datetime.date.today(), notes="bonus payment", created_by=admin_user,
+    )
+    Transaction.objects.create(
+        amount="200.00", type="expense", category="rent",
+        date=datetime.date.today(), notes="monthly rent", created_by=admin_user,
+    )
+    authed = auth_client(client, admin_user)
+    response = authed.get(reverse("transaction-list"), {"search": "bonus"})
+    assert response.status_code == 200
+    assert response.data["count"] == 1
+    assert response.data["data"][0]["notes"] == "bonus payment"
+
+
+@pytest.mark.django_db
+def test_search_by_category(client, admin_user):
+    Transaction.objects.create(
+        amount="500.00", type="income", category="freelance",
+        date=datetime.date.today(), created_by=admin_user,
+    )
+    Transaction.objects.create(
+        amount="200.00", type="expense", category="groceries",
+        date=datetime.date.today(), created_by=admin_user,
+    )
+    authed = auth_client(client, admin_user)
+    response = authed.get(reverse("transaction-list"), {"search": "freelance"})
+    assert response.status_code == 200
+    assert response.data["count"] == 1
+
+
+# --- Filtering ---
 
 @pytest.mark.django_db
 def test_filter_by_type(client, admin_user, transaction):
     Transaction.objects.create(
-        amount="200.00",
-        type="expense",
-        category="rent",
-        date=datetime.date.today(),
-        created_by=admin_user,
+        amount="200.00", type="expense", category="rent",
+        date=datetime.date.today(), created_by=admin_user,
     )
     authed = auth_client(client, admin_user)
     response = authed.get(reverse("transaction-list"), {"type": "income"})
@@ -114,18 +186,12 @@ def test_filter_by_category(client, admin_user, transaction):
 @pytest.mark.django_db
 def test_filter_by_date_range(client, admin_user):
     Transaction.objects.create(
-        amount="100.00",
-        type="income",
-        category="other",
-        date=datetime.date(2024, 1, 15),
-        created_by=admin_user,
+        amount="100.00", type="income", category="other",
+        date=datetime.date(2024, 1, 15), created_by=admin_user,
     )
     Transaction.objects.create(
-        amount="200.00",
-        type="expense",
-        category="rent",
-        date=datetime.date(2024, 6, 15),
-        created_by=admin_user,
+        amount="200.00", type="expense", category="rent",
+        date=datetime.date(2024, 6, 15), created_by=admin_user,
     )
     authed = auth_client(client, admin_user)
     response = authed.get(reverse("transaction-list"), {
@@ -136,7 +202,7 @@ def test_filter_by_date_range(client, admin_user):
     assert response.data["count"] == 1
 
 
-
+# --- Create ---
 
 @pytest.mark.django_db
 def test_admin_can_create_transaction(client, admin_user):
@@ -186,6 +252,7 @@ def test_create_transaction_missing_fields(client, admin_user):
     assert response.status_code == 400
 
 
+# --- Retrieve ---
 
 @pytest.mark.django_db
 def test_analyst_can_retrieve_transaction(client, analyst_user, transaction):
@@ -205,6 +272,8 @@ def test_viewer_cannot_retrieve_transaction(client, viewer_user, transaction):
     )
     assert response.status_code == 403
 
+
+# --- Update ---
 
 @pytest.mark.django_db
 def test_admin_can_update_transaction(client, admin_user, transaction):
@@ -230,6 +299,7 @@ def test_analyst_cannot_update_transaction(client, analyst_user, transaction):
     assert response.status_code == 403
 
 
+# --- Soft Delete ---
 
 @pytest.mark.django_db
 def test_admin_can_delete_transaction(client, admin_user, transaction):
@@ -239,6 +309,16 @@ def test_admin_can_delete_transaction(client, admin_user, transaction):
     )
     assert response.status_code == 200
     assert Transaction.objects.count() == 0
+    assert Transaction.all_objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_soft_deleted_transaction_not_in_list(client, admin_user, transaction):
+    transaction.soft_delete()
+    authed = auth_client(client, admin_user)
+    response = authed.get(reverse("transaction-list"))
+    assert response.status_code == 200
+    assert response.data["count"] == 0
 
 
 @pytest.mark.django_db
