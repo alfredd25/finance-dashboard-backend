@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from django.db import models
 from django.core.validators import MinValueValidator
 from apps.users.models import User
@@ -28,7 +29,7 @@ class Transaction(models.Model):
     amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
-        validators=[MinValueValidator(0.01)],
+        validators=[MinValueValidator(Decimal("0.01"))],
     )
     type = models.CharField(max_length=10, choices=Type.choices)
     category = models.CharField(max_length=20, choices=Category.choices, default=Category.OTHER)

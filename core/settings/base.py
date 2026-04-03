@@ -13,13 +13,13 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # Third party
+
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "drf_spectacular",
     "django_filters",
-    # Local
+
     "apps.users",
     "apps.finance",
     "apps.dashboard",
@@ -99,8 +99,12 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=config("JWT_ACCESS_LIFETIME_MINUTES", default=60, cast=int)),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=config("JWT_REFRESH_LIFETIME_DAYS", default=7, cast=int)),
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=config("JWT_ACCESS_LIFETIME_MINUTES", default=60, cast=int)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=config("JWT_REFRESH_LIFETIME_DAYS", default=7, cast=int)
+    ),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
@@ -108,16 +112,50 @@ SIMPLE_JWT = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Zorvyn Finance API",
-    "DESCRIPTION": "Finance dashboard backend — role-based access control over financial records and analytics.",
+    "DESCRIPTION": """
+## Finance Dashboard Backend
+
+A role-based finance management API for tracking transactions, analytics, and user management.
+
+### Roles
+
+- **Viewer**
+  - Dashboard summary only
+
+- **Analyst**
+  - Read transactions + all dashboard endpoints
+
+- **Admin**
+  - Full access — create, update, delete transactions and manage users
+
+### Authentication
+
+All endpoints require a Bearer token except:
+
+- `/api/auth/register/`
+- `/api/auth/login/`
+
+**Header format:**
+Authorization: Bearer <access_token>
+
+
+**Token flow:**
+- Obtain tokens → `/api/auth/login/`
+- Refresh access token → `/api/auth/refresh/`
+""",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
-}
-
-RATELIMIT_USE_CACHE = "default"
-
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-    }
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,
+        "displayRequestDuration": True,
+        "filter": True,
+    },
+    "TAGS": [
+        {"name": "Auth", "description": "Authentication: register, login, logout, token refresh"},
+        {"name": "Users", "description": "User management (Admin only)"},
+        {"name": "Transactions", "description": "Financial records CRUD operations"},
+        {"name": "Dashboard", "description": "Analytics, summaries, and insights"},
+    ],
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
 }

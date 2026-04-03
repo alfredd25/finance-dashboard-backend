@@ -2,8 +2,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import OrderingFilter
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 from django_ratelimit.decorators import ratelimit
@@ -16,7 +14,11 @@ from apps.users.permissions import IsAdmin, IsAnalystOrAbove
 
 
 class TransactionListView(APIView):
-    permission_classes = [IsAnalystOrAbove]
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAdmin()]
+        return [IsAnalystOrAbove()]
 
     @extend_schema(
         summary="List all transactions",
@@ -36,7 +38,6 @@ class TransactionListView(APIView):
     def get(self, request):
         queryset = Transaction.objects.select_related("created_by").all()
 
-        # Apply filters
         filterset = TransactionFilter(request.GET, queryset=queryset)
         if not filterset.is_valid():
             return Response(
@@ -45,7 +46,6 @@ class TransactionListView(APIView):
             )
         queryset = filterset.qs
 
-        # Apply ordering
         ordering = request.GET.get("ordering", "-date")
         allowed_ordering = ["date", "-date", "amount", "-amount", "created_at", "-created_at"]
         if ordering in allowed_ordering:
@@ -69,9 +69,6 @@ class TransactionListView(APIView):
     )
     @method_decorator(ratelimit(key="user", rate="60/m", method="POST", block=True))
     def post(self, request):
-        self.permission_classes = [IsAdmin]
-        self.check_permissions(request)
-
         serializer = TransactionCreateUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         transaction = serializer.save(created_by=request.user)
@@ -86,7 +83,11 @@ class TransactionListView(APIView):
 
 
 class TransactionDetailView(APIView):
-    permission_classes = [IsAnalystOrAbove]
+
+    def get_permissions(self):
+        if self.request.method in ("PATCH", "DELETE"):
+            return [IsAdmin()]
+        return [IsAnalystOrAbove()]
 
     def get_object(self, pk):
         return get_object_or_404(
@@ -113,9 +114,6 @@ class TransactionDetailView(APIView):
         tags=["Transactions"],
     )
     def patch(self, request, pk):
-        self.permission_classes = [IsAdmin]
-        self.check_permissions(request)
-
         transaction = self.get_object(pk)
         serializer = TransactionCreateUpdateSerializer(
             transaction, data=request.data, partial=True
@@ -136,9 +134,6 @@ class TransactionDetailView(APIView):
         tags=["Transactions"],
     )
     def delete(self, request, pk):
-        self.permission_classes = [IsAdmin]
-        self.check_permissions(request)
-
         transaction = self.get_object(pk)
         transaction.delete()
         return Response(
