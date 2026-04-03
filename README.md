@@ -41,6 +41,8 @@ A production-deployed, role-based finance management REST API built with Django 
 ## Architecture & Design
 
 ### Project Structure
+
+```
 .
 ├── core/                        # Django project config
 │   ├── settings/
@@ -53,22 +55,23 @@ A production-deployed, role-based finance management REST API built with Django 
 │   └── urls.py                  # Root URL config
 │
 └── apps/
-├── users/                   # Auth, user management, permissions
-│   ├── models.py            # CustomUser with Role enum
-│   ├── serializers.py       # Register, login, user serializers
-│   ├── permissions.py       # IsAdmin, IsAnalystOrAbove, IsAnyAuthenticatedUser
-│   ├── views/
-│   │   ├── auth_views.py    # Register, Login, Logout, Refresh
-│   │   └── user_views.py    # User CRUD + /me endpoint
-│   └── urls/
-├── finance/                 # Transaction management
-│   ├── models.py            # Transaction with soft delete
-│   ├── serializers.py       # Read + write serializers
-│   ├── filters.py           # Date, category, type, amount filters
-│   └── views.py             # CRUD + search + pagination
-└── dashboard/               # Analytics
-├── services.py          # Pure aggregation logic (no HTTP coupling)
-└── views.py             # Thin views calling service layer
+    ├── users/                   # Auth, user management, permissions
+    │   ├── models.py
+    │   ├── serializers.py
+    │   ├── permissions.py
+    │   ├── views/
+    │   └── urls/
+    │
+    ├── finance/                 # Transaction management
+    │   ├── models.py
+    │   ├── serializers.py
+    │   ├── filters.py
+    │   └── views.py
+    │
+    └── dashboard/               # Analytics
+        ├── services.py
+        └── views.py
+```
 
 ### Key Design Decisions
 
@@ -282,13 +285,6 @@ pytest apps/dashboard/
 ```
 
 **52 tests** covering all endpoints, role-based access scenarios, filtering, pagination, search, and soft delete behavior.
-
-| App | Tests |
-|---|---|
-| users | 16 |
-| finance | 22 |
-| dashboard | 14 |
-| **Total** | **52** |
 
 ---
 
