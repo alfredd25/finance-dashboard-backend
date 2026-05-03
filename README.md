@@ -1,4 +1,4 @@
-# Zorvyn Finance Dashboard — Backend API
+# Finance Dashboard — Backend API
 
 A production-deployed, role-based finance management REST API built with Django and Django REST Framework. The system supports multi-role user access, complete financial transaction management, and aggregated dashboard analytics — designed to serve a real-world finance dashboard frontend.
 
@@ -124,7 +124,7 @@ python manage.py migrate
 python manage.py shell -c "
 from apps.users.models import User
 User.objects.create_user(
-    email='admin@zorvyn.com',
+    email='admin@.com',
     password='AdminPass123!',
     role='admin',
     is_active=True
